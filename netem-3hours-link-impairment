@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""
+Cycle NetEm impairment on interface ens8:
+
+1. Impair link (520 ms delay, 1 % loss)   → keep for 3 h
+2. Remove impairment (healthy link)       → keep for 6 h
+3. Repeat forever
+
+Run with sudo (needs root to call `tc`).
+"""
+
+import subprocess
+import time
+import signal
+import sys
+from typing import List
+
+# --- Configuration ---------------------------------------------------------
+IFACE          = "ens8"
+IMPAIR_CMD     = ["tc", "qdisc", "add", "dev", IFACE, "root",
+                  "netem", "delay", "520ms", "loss", "1%"]
+HEAL_CMD       = ["tc", "qdisc", "del", "dev", IFACE, "root"]
+
+IMPAIR_HOURS   = 12          # hours to keep link impaired
+HEAL_HOURS     = 3         # hours to keep link healthy
+# ---------------------------------------------------------------------------
+
+def run(cmd: List[str]) -> None:
+    """Run a command and raise if it fails."""
+    subprocess.run(cmd, check=True)
+
+def impair() -> None:
+    print("[+] Impairing link …")
+    run(IMPAIR_CMD)
+    print(f"    Keeping impairment for {IMPAIR_HOURS} h")
+    time.sleep(IMPAIR_HOURS * 3600)
+
+def heal() -> None:
+    print("[+] Restoring healthy link …")
+    try:
+        run(HEAL_CMD)
+    except subprocess.CalledProcessError as exc:
+        if exc.returncode != 2:  # Ignore ENOENT (already deleted)
+            raise
+    print(f"    Keeping healthy link for {HEAL_HOURS} h")
+    time.sleep(HEAL_HOURS * 3600)
+
+def main() -> None:
+    signal.signal(signal.SIGINT, lambda *_: sys.exit(0))
+    print("=== NetEm cycle started (Ctrl-C to stop) ===")
+    while True:
+        impair()
+        heal()
+
+if __name__ == "__main__":
+    main()
