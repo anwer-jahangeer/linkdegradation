@@ -1,0 +1,12 @@
+# /etc/systemd/system/netem-cycle.service
+[Unit]
+Description=Cycle NetEm impairment on ens8
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/ashah/netem_cycle.py
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
